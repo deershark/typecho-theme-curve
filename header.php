@@ -5,7 +5,7 @@
 <head>
     <meta charset="<?php $this->options->charset(); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title><?php $this->archiveTitle('', '', ' - '); ?><?php $this->options->title(); ?></title>
+    <title><?php if ($this->is('category')): ?>分类 <?php $this->archiveTitle('', '', ''); ?> 下的文章 - <?php elseif ($this->is('tag')): ?>标签 <?php $this->archiveTitle('', '', ''); ?> 下的文章 - <?php elseif ($this->is('author')): ?>作者 <?php $this->archiveTitle('', '', ''); ?> 发布的文章 - <?php else: ?><?php $this->archiveTitle('', '', ' - '); ?><?php endif; ?><?php $this->options->title(); ?></title>
     <?php $curveFavicon = curve_option($this->options, 'logoUrl'); if ($curveFavicon === '') $curveFavicon = curve_theme_asset_url($this->options, 'assets/images/logo.webp'); ?>
     <link rel="icon" href="<?php echo curve_esc($curveFavicon); ?>" type="image/webp">
     <script>
