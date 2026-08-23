@@ -15,6 +15,58 @@ function curve_option($options, $name, $default = '')
     return $value === '' ? $default : $value;
 }
 
+/** 只允许安全的 HTTP(S)、站内路径，以及按需允许的 mailto 地址。 */
+function curve_url_is_allowed($value, $allowRelative = false, $allowMailto = false)
+{
+    $value = trim(htmlspecialchars_decode((string) $value, ENT_QUOTES));
+    if ($value === '' || preg_match('/[\x00-\x20\x7f"\'<>\\\\]/u', $value)) {
+        return false;
+    }
+
+    if ($allowRelative && $value[0] === '/' && substr($value, 0, 2) !== '//') {
+        return true;
+    }
+
+    if (!filter_var($value, FILTER_VALIDATE_URL)) {
+        return false;
+    }
+
+    $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+    if ($scheme === 'http' || $scheme === 'https') {
+        return true;
+    }
+    if ($allowMailto && $scheme === 'mailto') {
+        $address = preg_replace('/^mailto:/i', '', $value);
+        $address = explode('?', $address, 2)[0];
+        return filter_var($address, FILTER_VALIDATE_EMAIL) !== false;
+    }
+    return false;
+}
+
+function curve_safe_http_url($value)
+{
+    $value = trim((string) $value);
+    return curve_url_is_allowed($value) ? $value : '';
+}
+
+function curve_safe_asset_url($value)
+{
+    $value = trim((string) $value);
+    return curve_url_is_allowed($value, true) ? $value : '';
+}
+
+function curve_validate_http_url($value)
+{
+    $value = trim((string) $value);
+    return $value === '' || curve_url_is_allowed($value);
+}
+
+function curve_validate_asset_url($value)
+{
+    $value = trim((string) $value);
+    return $value === '' || curve_url_is_allowed($value, true);
+}
+
 /** 读取并校验文章正文链接的打开方式。 */
 function curve_article_link_target($options)
 {
@@ -56,9 +108,7 @@ function curve_apply_article_link_target($content, $target = 'blank')
 function curve_validate_background_url($value)
 {
     $value = trim((string) $value);
-    if ($value === '') return true;
-    return preg_match('/^(?:https?:\/\/|\/)/i', $value) === 1
-        && preg_match('/[\s\'"<>]/u', $value) !== 1;
+    return $value === '' || curve_url_is_allowed($value, true);
 }
 
 /** 主题支持的前台字体标识。 */
@@ -294,13 +344,7 @@ function curve_lines($value)
 function curve_about_asset_url($value, $default = '')
 {
     $value = trim((string) $value);
-    if ($value === '' || preg_match('/[\s\'"()<>]/u', $value)) {
-        return $default;
-    }
-    if (preg_match('/^https?:\/\//i', $value) || strpos($value, '/') === 0) {
-        return $value;
-    }
-    return $default;
+    return curve_url_is_allowed($value, true) ? $value : $default;
 }
 
 /** 解析 page-about.php 使用的 curve-about 特殊 Markdown 块。 */
@@ -489,7 +533,7 @@ function curve_about_parse_markdown($content)
     return array('valid' => !$invalid, 'data' => array_merge($data, array('sections' => $sections)), 'sections' => $sections, 'errors' => array_values(array_unique($errors)));
 }
 
-function curve_link_rows($value)
+function curve_link_rows($value, $allowMailto = false)
 {
     $items = array();
     $rows = curve_json_decode($value, null);
@@ -509,7 +553,8 @@ function curve_link_rows($value)
         }
         $name = isset($row['name']) ? trim((string) $row['name']) : '';
         $url = isset($row['url']) ? trim((string) $row['url']) : '';
-        if ($name !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
+        $isEmail = preg_match('/(?:email|mail|邮箱)/iu', $name) === 1;
+        if ($name !== '' && curve_url_is_allowed($url, false, $allowMailto && $isEmail)) {
             $items[] = array(
                 'name' => $name,
                 'url' => $url,
@@ -555,13 +600,13 @@ function curve_top_left_menu_rows($value)
         $group = isset($row['group']) ? trim((string) $row['group']) : '';
         $name = isset($row['name']) ? trim((string) $row['name']) : '';
         $url = isset($row['url']) ? trim((string) $row['url']) : '';
-        if ($group === '' || $name === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+        if ($group === '' || $name === '' || !curve_url_is_allowed($url)) {
             continue;
         }
 
         $iconValue = isset($row['icon']) ? trim((string) $row['icon']) : '';
         $iconUrl = '';
-        if (preg_match('/^https?:\/\//i', $iconValue) && filter_var($iconValue, FILTER_VALIDATE_URL)) {
+        if (curve_url_is_allowed($iconValue)) {
             $iconUrl = $iconValue;
             $icon = '';
         } else {
@@ -720,11 +765,11 @@ function curve_parse_friend_markdown($content, $detailed = false)
                 $addError($lineNumber, '友链名称不能为空。');
                 continue;
             }
-            if (!filter_var($parts[1], FILTER_VALIDATE_URL)) {
+            if (!curve_url_is_allowed($parts[1])) {
                 $addError($lineNumber, '友链链接不是有效 URL，请检查链接地址。');
                 continue;
             }
-            if (isset($parts[2]) && $parts[2] !== '' && !filter_var($parts[2], FILTER_VALIDATE_URL)) {
+            if (isset($parts[2]) && $parts[2] !== '' && !curve_url_is_allowed($parts[2])) {
                 $addError($lineNumber, '头像地址不是有效 URL；如果不需要头像，请留空该字段。');
                 continue;
             }
@@ -827,7 +872,7 @@ function curve_footer_friend_links()
     $validFriends = array();
     foreach ($friends as $friend) {
         $url = isset($friend['url']) ? trim((string) $friend['url']) : '';
-        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL) || isset($unique[$url])) {
+        if ($url === '' || !curve_url_is_allowed($url) || isset($unique[$url])) {
             continue;
         }
         $unique[$url] = true;
@@ -842,7 +887,7 @@ function curve_default_covers($options)
     $covers = array();
     foreach (curve_json_option($options, 'defaultCovers') as $cover) {
         $cover = trim((string) $cover);
-        if ($cover !== '' && filter_var($cover, FILTER_VALIDATE_URL)) {
+        if ($cover !== '' && curve_url_is_allowed($cover)) {
             $covers[] = $cover;
         }
     }
@@ -896,10 +941,7 @@ function curve_markdown_inner_html($content)
 function curve_markdown_safe_url($value)
 {
     $value = trim(htmlspecialchars_decode((string) $value, ENT_QUOTES));
-    if ($value === '' || preg_match('/[\s"\'<>]/u', $value)) {
-        return '';
-    }
-    return preg_match('/^(?:https?:\/\/|\/)/i', $value) ? $value : '';
+    return curve_url_is_allowed($value, true) ? $value : '';
 }
 
 /** 渲染原 Curve 主题的 LinkCard 组件；不抓取远程站点，避免文章渲染被网络阻塞。 */
@@ -1587,7 +1629,7 @@ function curve_markdown_render_image($url, $alt = '', $title = '')
     $url = trim(htmlspecialchars_decode((string) $url, ENT_QUOTES));
     $alt = htmlspecialchars_decode((string) $alt, ENT_QUOTES);
     $title = htmlspecialchars_decode((string) $title, ENT_QUOTES);
-    if ($url === '' || preg_match('/[\s"\'<>]/u', $url) || !preg_match('/^(?:https?:\/\/|\/)/i', $url)) {
+    if ($url === '' || !curve_url_is_allowed($url, true)) {
         return '';
     }
     $attributes = ' class="post-img" src="' . curve_esc($url) . '" alt="' . curve_esc($alt) . '"';
@@ -1700,6 +1742,48 @@ function curve_views_read($db, $cid)
     return max(0, (int) $row['str_value']);
 }
 
+/** 检查 typecho_contents 是否存在原生 views 列；结果仅缓存到当前请求。 */
+function curve_contents_views_column_exists($db)
+{
+    static $exists = null;
+    if ($exists !== null) {
+        return $exists;
+    }
+
+    try {
+        $select = $db->select('views')
+            ->from('table.contents')
+            ->limit(1);
+        $db->fetchRow($select);
+        $exists = true;
+    } catch (Exception $exception) {
+        $exists = false;
+    }
+    return $exists;
+}
+
+/** 读取 typecho_contents.views；不存在该列时返回 null。 */
+function curve_contents_views_read($db, $cid)
+{
+    if (!curve_contents_views_column_exists($db)) {
+        return null;
+    }
+
+    try {
+        $select = $db->select('views')
+            ->from('table.contents')
+            ->where('cid = ?', (int) $cid)
+            ->limit(1);
+        $row = $db->fetchRow($select);
+        if (!is_array($row) || !array_key_exists('views', $row)) {
+            return null;
+        }
+        return max(0, (int) $row['views']);
+    } catch (Exception $exception) {
+        return null;
+    }
+}
+
 /** 创建文章访问量字段，首次访问旧文章时也能直接开始计数。 */
 function curve_views_ensure_field($db, $cid)
 {
@@ -1769,21 +1853,23 @@ function curve_record_view($post)
     $viewedIds = curve_views_cookie_ids();
     $alreadyViewed = in_array($cid, $viewedIds, true);
     $db = Typecho_Db::get();
+    $nativeViews = curve_contents_views_read($db, $cid);
+    $nativeViews = $nativeViews === null ? 0 : $nativeViews;
     $current = curve_views_read($db, $cid);
     $current = $current === null ? $fallback : $current;
     if ($alreadyViewed) {
-        return $current;
+        return $nativeViews + $current;
     }
 
     try {
         $views = curve_views_increment($db, $cid);
         if ($views === null) {
-            return $current;
+            return $nativeViews + $current;
         }
         curve_views_mark_cookie($cid, $viewedIds);
-        return $views;
+        return $nativeViews + $views;
     } catch (Exception $exception) {
-        return $current;
+        return $nativeViews + $current;
     }
 }
 
@@ -1997,6 +2083,7 @@ function curve_comment_location($ip)
     }
 
     static $runtimeCache = array();
+    static $remoteLookups = 0;
     if (isset($runtimeCache[$ip])) {
         return $runtimeCache[$ip];
     }
@@ -2009,6 +2096,14 @@ function curve_comment_location($ip)
             return $runtimeCache[$ip] = (string) $cached['location'];
         }
     }
+
+    /* Never let a comment page fan out into one blocking request per comment.
+     * The caller must explicitly opt in, and only one uncached IP is looked up
+     * during a request; other IPs remain unknown until a later cache warm-up. */
+    if ($remoteLookups >= 1) {
+        return $runtimeCache[$ip] = '未知地区';
+    }
+    $remoteLookups++;
 
     $url = 'https://ipwho.is/' . rawurlencode($ip) . '?lang=zh-CN&fields=success,country,country_code,region,city';
     $body = false;
@@ -2071,6 +2166,7 @@ function threadedComments($comments, $options)
     $isAuthor = (int) $comments->authorId > 0 && (int) $comments->authorId === (int) $comments->ownerId;
     $themeOptions = Typecho_Widget::widget('Widget_Options');
     $showAuthorSensitive = curve_is_enabled($themeOptions, 'commentAuthorShowSensitive', false);
+    $showCommentLocation = curve_is_enabled($themeOptions, 'commentLocationEnable', false);
     $showSensitiveMeta = !$isAuthor || $showAuthorSensitive;
     $commentAgent = isset($comments->agent) ? $comments->agent : '';
     $commentIp = isset($comments->ip) ? $comments->ip : '';
@@ -2097,7 +2193,7 @@ function threadedComments($comments, $options)
                 <div class="comment-item__meta">
                     <time data-comment-time="<?php echo $commentTime > 0 ? $commentTime : ''; ?>" data-comment-absolute="<?php echo $commentIsAbsolute ? '1' : '0'; ?>" datetime="<?php echo $commentTime > 0 ? date('c', $commentTime) : ''; ?>" title="<?php echo $commentTime > 0 ? date('Y-m-d H:i', $commentTime) : ''; ?>"><?php echo curve_esc(curve_comment_relative_time($comments)); ?></time>
                     <?php if ($showSensitiveMeta): ?>
-                    <span>IP 归属地: <?php echo curve_esc(curve_comment_location($commentIp)); ?></span>
+                    <?php if ($showCommentLocation): ?><span>IP 归属地: <?php echo curve_esc(curve_comment_location($commentIp)); ?></span><?php endif; ?>
                     <span>系统: <?php echo curve_esc(curve_comment_client_meta($commentAgent)); ?></span>
                     <?php endif; ?>
                 </div>
