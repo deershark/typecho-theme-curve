@@ -83,7 +83,7 @@ function curve_validate_social_links_json($value)
         if ($name === 'twitter-x') {
             $name = 'twitter';
         }
-        if (!is_array($link) || !in_array($name, $allowedNames, true) || isset($seenNames[$name]) || empty($link['url']) || !filter_var($link['url'], FILTER_VALIDATE_URL)) {
+        if (!is_array($link) || !in_array($name, $allowedNames, true) || isset($seenNames[$name]) || empty($link['url']) || !curve_url_is_allowed($link['url'], false, $name === 'email')) {
             return false;
         }
         $seenNames[$name] = true;
@@ -108,13 +108,13 @@ function curve_validate_top_left_menu_json($value)
                 return false;
             }
             foreach ($category['items'] as $item) {
-                if (!is_array($item) || empty($item['name']) || empty($item['url']) || !filter_var($item['url'], FILTER_VALIDATE_URL)) {
+                if (!is_array($item) || empty($item['name']) || empty($item['url']) || !curve_url_is_allowed($item['url'])) {
                     return false;
                 }
             }
             continue;
         }
-        if (empty($category['group']) || empty($category['name']) || empty($category['url']) || !filter_var($category['url'], FILTER_VALIDATE_URL)) {
+        if (empty($category['group']) || empty($category['name']) || empty($category['url']) || !curve_url_is_allowed($category['url'])) {
             return false;
         }
     }
@@ -130,7 +130,7 @@ function curve_validate_cover_urls_json($value)
     }
 
     foreach ($covers as $cover) {
-        if (!is_string($cover) || trim($cover) === '' || !filter_var($cover, FILTER_VALIDATE_URL)) {
+        if (!is_string($cover) || trim($cover) === '' || !curve_url_is_allowed($cover)) {
             return false;
         }
     }
@@ -142,7 +142,9 @@ function themeConfig($form)
 {
     /* 基础信息 */
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Text('siteAuthorName', null, '鱼鱼', _t('博主名称'), _t('显示在侧栏和页脚。')));
-    $form->addInput(new Typecho_Widget_Helper_Form_Element_Text('siteAuthorLink', null, '', _t('博主链接'), _t('社交链接为空且填写此项时，显示为侧栏和页脚社交入口；也会作为页脚版权署名的链接。')));
+    $siteAuthorLink = new Typecho_Widget_Helper_Form_Element_Text('siteAuthorLink', null, '', _t('博主链接'), _t('社交链接为空且填写此项时，显示为侧栏和页脚社交入口；也会作为页脚版权署名的链接。'));
+    $siteAuthorLink->addRule('curve_validate_http_url', _t('博主链接必须是 http(s) 地址。'));
+    $form->addInput($siteAuthorLink);
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Text('siteAuthorEmail', null, '', _t('博主邮箱'), _t('社交链接为空且填写此项时，显示为侧栏和页脚 Email 社交入口。')));
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Textarea('intro', null, '记录值得分享的技术、想法与生活。', _t('站点简介'), _t('显示在侧栏时钟卡片中，鼠标悬停时替换时钟显示。')));
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Select(
@@ -154,7 +156,9 @@ function themeConfig($form)
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Text(
         'sidebarAuthorDescription', null, '分享技术生活', _t('侧栏作者简介'), _t('显示在右侧时钟卡片的作者名称下方。')
     ));
-    $form->addInput(new Typecho_Widget_Helper_Form_Element_Text('logoUrl', null, '', _t('Logo 地址'), _t('用于页面加载动画和页脚头像；留空时使用主题默认 Logo。')));
+    $logoUrl = new Typecho_Widget_Helper_Form_Element_Text('logoUrl', null, '', _t('Logo 地址'), _t('用于页面加载动画和页脚头像；留空时使用主题默认 Logo。'));
+    $logoUrl->addRule('curve_validate_asset_url', _t('Logo 地址必须是 http(s) 地址或站内绝对路径。'));
+    $form->addInput($logoUrl);
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Text('recordNumber', null, '', _t('备案号'), _t('留空则不显示备案号。')));
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Text('since', null, '', _t('建站日期'), _t('格式：2020-07-28；用于侧栏站点数据和“关于本站”页面的建站天数。')));
 
@@ -238,13 +242,19 @@ function themeConfig($form)
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Select(
         'postLinkTarget', array('self' => _t('本页打开'), 'blank' => _t('新标签页打开')), 'blank', _t('文章正文链接打开方式'), _t('控制文章正文中的 Markdown、HTML 和 LinkCard 链接；文章标题、分类、评论等页面结构链接不受影响。')
     ));
-    $form->addInput(new Typecho_Widget_Helper_Form_Element_Text('reportUrl', null, '', _t('投诉反馈地址'), _t('填写后在文章页显示“反馈与投诉”，并加入页脚服务链接；主题不内置反馈页面。')));
-    $form->addInput(new Typecho_Widget_Helper_Form_Element_Text(
+    $reportUrl = new Typecho_Widget_Helper_Form_Element_Text('reportUrl', null, '', _t('投诉反馈地址'), _t('填写后在文章页显示“反馈与投诉”，并加入页脚服务链接；主题不内置反馈页面。'));
+    $reportUrl->addRule('curve_validate_http_url', _t('投诉反馈地址必须是 http(s) 地址。'));
+    $form->addInput($reportUrl);
+    $rewardWechat = new Typecho_Widget_Helper_Form_Element_Text(
         'rewardWechat', null, '', _t('微信收款码地址'), _t('填写图片地址后，在文章页赞赏弹窗中显示微信收款码。')
-    ));
-    $form->addInput(new Typecho_Widget_Helper_Form_Element_Text(
+    );
+    $rewardWechat->addRule('curve_validate_asset_url', _t('微信收款码地址必须是 http(s) 地址或站内绝对路径。'));
+    $form->addInput($rewardWechat);
+    $rewardAlipay = new Typecho_Widget_Helper_Form_Element_Text(
         'rewardAlipay', null, '', _t('支付宝收款码地址'), _t('填写图片地址后，在文章页赞赏弹窗中显示支付宝收款码。')
-    ));
+    );
+    $rewardAlipay->addRule('curve_validate_asset_url', _t('支付宝收款码地址必须是 http(s) 地址或站内绝对路径。'));
+    $form->addInput($rewardAlipay);
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Radio(
         'travellingsEnable', array('1' => _t('开启'), '0' => _t('关闭')), '1', _t('开往按钮'), _t('控制页面右上角的“开往-友链接力”按钮是否显示。')
     ));
@@ -269,6 +279,9 @@ function themeConfig($form)
     $form->addInput(new Typecho_Widget_Helper_Form_Element_Radio(
         'commentAuthorShowSensitive', array('1' => _t('显示'), '0' => _t('隐藏')), '0', _t('作者评论/回复显示 IP 和系统信息'), _t('关闭后，作者发布的评论和回复只显示时间，不公开 IP 归属地和系统信息。')
     ));
+    $form->addInput(new Typecho_Widget_Helper_Form_Element_Radio(
+        'commentLocationEnable', array('1' => _t('开启'), '0' => _t('关闭')), '0', _t('评论 IP 归属地查询'), _t('默认关闭。开启后仅对每个请求中第一条未缓存的公开 IP 查询 ipwho.is，其余未缓存 IP 显示未知地区。')
+    ));
 }
 
 /** 文章自定义字段。 */
@@ -279,7 +292,7 @@ function themeFields($layout)
     $layout->addItem(new Typecho_Widget_Helper_Form_Element_Radio('top', array('0' => _t('否'), '1' => _t('是')), '0', _t('置顶标记'), _t('显示置顶样式，并让文章在首页和首页分类筛选中优先排序。')));
     $layout->addItem(new Typecho_Widget_Helper_Form_Element_Textarea('references', null, '', _t('参考资料'), _t('一行一个，格式：标题|链接。')));
     $layout->addItem(new Typecho_Widget_Helper_Form_Element_Radio('copyright', array('1' => _t('显示'), '0' => _t('隐藏')), '1', _t('版权卡片')));
-    $views = new Typecho_Widget_Helper_Form_Element_Text('views', null, '0', _t('访问量'), _t('文章访问量，主题会在访问文章时自动累加。'));
+    $views = new Typecho_Widget_Helper_Form_Element_Text('views', null, '0', _t('访问量'), _t('主题自定义访问量，主题会在访问文章时自动累加；如果数据库的 typecho_contents 表存在 views 列，文章页显示该列与此字段之和。'));
     $views->addRule('curve_validate_non_negative_integer', _t('访问量必须是非负整数。'));
     $layout->addItem($views);
 }

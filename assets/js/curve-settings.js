@@ -42,7 +42,7 @@
       icon: "chat",
       title: "评论与互动",
       description: "控制评论区、开往按钮和反馈入口。",
-      fields: ["commentEnable", "commentFormPosition", "commentPlaceholder", "commentAuthorShowSensitive", "reportUrl", "travellingsEnable"]
+      fields: ["commentEnable", "commentFormPosition", "commentPlaceholder", "commentAuthorShowSensitive", "commentLocationEnable", "reportUrl", "travellingsEnable"]
     },
     {
       id: "footer",
