@@ -4,7 +4,7 @@
  *
  * @package Curve for Typecho
  * @author 鹿形鱼 <https://blog.xingyu.lu/>
- * @version 0.0.18
+ * @version 0.1.0
  * @link https://github.com/deershark/typecho-theme-curve
  */
 ?>
