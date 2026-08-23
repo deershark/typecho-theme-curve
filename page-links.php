@@ -41,7 +41,12 @@ if (preg_match('/<!--\s*curve-friends\b/is', $pageSource)) {
 }
 $pageHtml = curve_render_markdown($pageSource);
 foreach ($friendBlocks as $slot => $html) {
-    $pageHtml = str_replace('<p>' . $slot . '</p>', $html, $pageHtml);
+    /* 富文本编辑器可能将占位符包成 <p><br>标记<br></p>；替换时一并去掉
+     * 空段落，避免把友链卡片 <div> 塞进 <p> 后产生多余的 <br>。 */
+    $slotPattern = preg_quote($slot, '/');
+    $pageHtml = preg_replace_callback('/<p\b[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*' . $slotPattern . '(?:\s|&nbsp;|<br\s*\/?>)*<\/p>/i', function () use ($html) {
+        return $html;
+    }, $pageHtml);
     $pageHtml = str_replace($slot, $html, $pageHtml);
 }
 if (!$friendParseValid) {
