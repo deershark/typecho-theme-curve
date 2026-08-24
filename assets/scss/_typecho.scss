@@ -487,6 +487,7 @@ html.image .home:not(.archive-page) .type-bar {
 .category-summary .summary-description { max-width: 52rem; margin: .75rem 0 0; color: var(--main-font-second-color); line-height: 1.75; }
 .category-summary .summary-count { display: block; margin-top: 1rem; color: var(--main-font-second-color); opacity: .8; }
 .archives-page .archive-heading { min-height: auto; margin-bottom: 1rem; }
+.next-post-trigger { display: block; height: 1px; pointer-events: none; }
 .next-post .post-title a { color: inherit; }
 .next-post:hover .post-title a { color: var(--main-card-background); }
 .tags-cloud .all-tags { max-height: none; overflow: visible; }
