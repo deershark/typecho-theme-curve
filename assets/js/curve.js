@@ -1070,14 +1070,14 @@
 
   var footer = document.getElementById("main-footer");
   var nextPost = document.querySelector("[data-next-post]");
-  var articleContent = document.getElementById("page-content");
-  var articleContentVisible = true;
+  var nextPostTrigger = document.querySelector("[data-next-post-trigger]");
   var footerVisible = false;
   var settingsButton = document.querySelector("[data-settings-open]");
   var syncLeftMenuWithFooter = function () {};
   function syncNextPost() {
     if (!nextPost) return;
-    nextPost.classList.toggle("show", infoPosition === "fixed" && !articleContentVisible && !footerVisible);
+    var reachedArticleEnd = nextPostTrigger && nextPostTrigger.getBoundingClientRect().top <= window.innerHeight;
+    nextPost.classList.toggle("show", infoPosition === "fixed" && reachedArticleEnd && !footerVisible);
   }
   if (footer && settingsButton) {
     /* Match the original theme: the floating menu follows the visibility of
@@ -1096,14 +1096,10 @@
     window.addEventListener("resize", syncLeftMenuWithFooter, { passive: true });
     syncLeftMenuWithFooter();
   }
-  if (nextPost && articleContent && "IntersectionObserver" in window) {
-    var articleObserver = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        articleContentVisible = entry.isIntersecting;
-        syncNextPost();
-      });
-    });
-    articleObserver.observe(articleContent);
+  if (nextPost && nextPostTrigger) {
+    window.addEventListener("scroll", syncNextPost, { passive: true });
+    window.addEventListener("resize", syncNextPost, { passive: true });
+    syncNextPost();
   }
 
   document.addEventListener("keydown", function (event) { if (event.key === "Escape") { toggleMobile(false); toggleSearch(false); toggleControl(false); toggleSettings(false); } });

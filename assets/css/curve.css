@@ -6432,6 +6432,12 @@ button.s-card,
   margin-bottom: 1rem;
 }
 
+.next-post-trigger {
+  display: block;
+  height: 1px;
+  pointer-events: none;
+}
+
 .next-post .post-title a {
   color: inherit;
 }
